@@ -365,6 +365,38 @@ abstract class Delay with _$Delay {
 }
 
 @freezed
+@freezed
+abstract class ProbeParams with _$ProbeParams {
+  const factory ProbeParams({
+    required String url,
+    @JsonKey(name: 'proxy-name') @Default('') String proxyName,
+    @Default({}) Map<String, String> headers,
+    required int timeout,
+    @JsonKey(name: 'max-body') @Default(0) int maxBody,
+  }) = _ProbeParams;
+
+  factory ProbeParams.fromJson(Map<String, Object?> json) =>
+      _$ProbeParamsFromJson(json);
+}
+
+@freezed
+abstract class ProbeResult with _$ProbeResult {
+  const factory ProbeResult({
+    @JsonKey(name: 'status-code') @Default(0) int statusCode,
+    @Default(0) int delay,
+    @Default('') String body,
+    @Default('') String url,
+    @Default([]) List<String> chains,
+    @Default('') String rule,
+    @JsonKey(name: 'rule-payload') @Default('') String rulePayload,
+    String? error,
+    String? message,
+  }) = _ProbeResult;
+
+  factory ProbeResult.fromJson(Map<String, Object?> json) =>
+      _$ProbeResultFromJson(json);
+}
+
 abstract class OutboundIpParams with _$OutboundIpParams {
   const factory OutboundIpParams({
     @JsonKey(name: 'proxy-name') @Default('') String proxyName,

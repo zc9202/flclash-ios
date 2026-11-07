@@ -489,6 +489,54 @@ Map<String, dynamic> _$DelayToJson(_Delay instance) => <String, dynamic>{
   'value': instance.value,
 };
 
+_ProbeParams _$ProbeParamsFromJson(Map<String, dynamic> json) => _ProbeParams(
+  url: json['url'] as String,
+  proxyName: json['proxy-name'] as String? ?? '',
+  headers:
+      (json['headers'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ) ??
+      const {},
+  timeout: (json['timeout'] as num).toInt(),
+  maxBody: (json['max-body'] as num?)?.toInt() ?? 0,
+);
+
+Map<String, dynamic> _$ProbeParamsToJson(_ProbeParams instance) =>
+    <String, dynamic>{
+      'url': instance.url,
+      'proxy-name': instance.proxyName,
+      'headers': instance.headers,
+      'timeout': instance.timeout,
+      'max-body': instance.maxBody,
+    };
+
+_ProbeResult _$ProbeResultFromJson(Map<String, dynamic> json) => _ProbeResult(
+  statusCode: (json['status-code'] as num?)?.toInt() ?? 0,
+  delay: (json['delay'] as num?)?.toInt() ?? 0,
+  body: json['body'] as String? ?? '',
+  url: json['url'] as String? ?? '',
+  chains:
+      (json['chains'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+  rule: json['rule'] as String? ?? '',
+  rulePayload: json['rule-payload'] as String? ?? '',
+  error: json['error'] as String?,
+  message: json['message'] as String?,
+);
+
+Map<String, dynamic> _$ProbeResultToJson(_ProbeResult instance) =>
+    <String, dynamic>{
+      'status-code': instance.statusCode,
+      'delay': instance.delay,
+      'body': instance.body,
+      'url': instance.url,
+      'chains': instance.chains,
+      'rule': instance.rule,
+      'rule-payload': instance.rulePayload,
+      'error': instance.error,
+      'message': instance.message,
+    };
+
 _OutboundIpParams _$OutboundIpParamsFromJson(Map<String, dynamic> json) =>
     _OutboundIpParams(
       proxyName: json['proxy-name'] as String? ?? '',
