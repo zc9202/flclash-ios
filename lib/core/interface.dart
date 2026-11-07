@@ -66,8 +66,9 @@ abstract class CoreHandlerInterface {
     CoreMethod method,
     R Function(Object data) decode, {
     Object? arguments,
+    Duration? timeout,
   }) async {
-    final data = await _call(method, arguments: arguments);
+    final data = await _call(method, arguments: arguments, timeout: timeout);
     return data == null ? null : decode(data);
   }
 
@@ -345,6 +346,15 @@ abstract class CoreHandlerInterface {
       _model(RouteCheck.fromJson),
       arguments: params.toJson(),
       timeout: coreGuardFor(probeTimeoutDuration.inMilliseconds),
+    );
+  }
+
+  Future<ProbeResult?> probe(ProbeParams params) {
+    return _find(
+      CoreMethod.probe,
+      _model(ProbeResult.fromJson),
+      arguments: params.toJson(),
+      timeout: probeGuardDuration(params),
     );
   }
 

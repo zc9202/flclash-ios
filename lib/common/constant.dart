@@ -66,6 +66,8 @@ const delayTimedOutValue = -1;
 
 const probeTimeoutDuration = Duration(seconds: 10);
 
+Duration probeGuardDuration(ProbeParams params) => coreGuardFor(params.timeout);
+
 /// Outlasts the Core's one-second pick poll (`routePollInterval` in
 /// core/route.go), so groups re-picking on neighbouring polls cost one route
 /// check.

@@ -203,6 +203,7 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	proxyDefinitionMethod:  withFallible(handleGetProxyDefinition),
 	proxyTestDelayMethod:   withArguments(handleTestDelay),
 	asyncTestDelayMethod:   withFallible(handleAvailableTestDelay),
+	probeMethod:            withArguments(handleProbe),
 	prepareDelayTestMethod: command(prepareDelayTest),
 	getDelayTestConfigurationMethod: withFallible(func(_ struct{}) (*delayPreparationParams, error) {
 		return delayTestConfiguration()

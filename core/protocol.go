@@ -39,6 +39,7 @@ const (
 	proxyTestDelayMethod            CoreMethod = "proxy.testDelay"
 	asyncTestDelayMethod            CoreMethod = "asyncTestDelay"
 	prepareDelayTestMethod          CoreMethod = "prepareDelayTest"
+	probeMethod                     CoreMethod = "probe"
 	getDelayTestConfigurationMethod CoreMethod = "getDelayTestConfiguration"
 	proxyValidateMethod             CoreMethod = "proxy.validate"
 	proxyConvertMethod              CoreMethod = "proxy.convert"
@@ -270,6 +271,14 @@ type Delay struct {
 	Url   string `json:"url"`
 	Name  string `json:"name"`
 	Value int32  `json:"value"`
+}
+
+type ProbeParams struct {
+	Url       string            `json:"url"`
+	ProxyName string            `json:"proxy-name"`
+	Headers   map[string]string `json:"headers"`
+	Timeout   int64             `json:"timeout"`
+	MaxBody   int64             `json:"max-body"`
 }
 
 type Traffic struct {
