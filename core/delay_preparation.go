@@ -139,8 +139,3 @@ func delayTestConfiguration() (*delayPreparationParams, error) {
 	picks, _ := readPicks()
 	return &delayPreparationParams{Digest: appliedDelayDigest, SelectedMap: picks, TestURL: currentTestURL(), SkipCertVerify: skipCertVerify.Load()}, nil
 }
-
-func init() {
-	registerMethod(CoreMethod("prepareDelayTest"), withMessage(prepareDelayTest))
-	registerMethod(CoreMethod("getDelayTestConfiguration"), func(*MethodCall) (any, error) { return delayTestConfiguration() })
-}
