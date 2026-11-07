@@ -37,6 +37,7 @@ const (
 	proxySelectMethod     CoreMethod = "proxy.select"
 	proxyDefinitionMethod CoreMethod = "proxy.definition"
 	proxyTestDelayMethod  CoreMethod = "proxy.testDelay"
+	asyncTestDelayMethod  CoreMethod = "asyncTestDelay"
 	proxyValidateMethod   CoreMethod = "proxy.validate"
 	proxyConvertMethod    CoreMethod = "proxy.convert"
 	shareLinkEncodeMethod CoreMethod = "shareLink.encode"
@@ -106,8 +107,9 @@ type Message struct {
 }
 
 type InitParams struct {
-	HomeDir string `json:"home-dir"`
-	Version int    `json:"version"`
+	CachePath string `json:"cache-path,omitempty"`
+	HomeDir   string `json:"home-dir"`
+	Version   int    `json:"version"`
 }
 
 type DecryptConfigParams struct {

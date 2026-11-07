@@ -143,11 +143,30 @@ class SetupAction extends _$SetupAction {
   @protected
   Future<DateTime?> serviceStartTime() async => service?.getRunTime();
 
+  Future<bool> restoreIOSRunningState() async {
+    if (!system.isIOS) return false;
+    final started = await service?.getRunTime();
+    _startTime = started;
+    _setLocalRunning(started != null);
+    ref.read(runningVpnOptionsProvider.notifier).value = started == null
+        ? null
+        : await ref.read(vpnOptionsProvider.future);
+    return started != null;
+  }
+
   Future<void> initStatus() async {
     if (!globalState.needInitStatus) {
       return;
     }
     _startTime = await serviceStartTime();
+    if (system.isIOS && _isRunning) {
+      // Adopt the live extension; do not reapply a profile just to restore UI.
+      globalState.needInitStatus = false;
+      _setLocalRunning(true);
+      ref.read(runningVpnOptionsProvider.notifier).value =
+          await ref.read(vpnOptionsProvider.future);
+      return;
+    }
     if (_isRunning) {
       globalState.lastConfigMd5 = await preferences.getAppliedConfigMd5();
       await _run(true, initialize: true, resume: true);
@@ -156,6 +175,13 @@ class SetupAction extends _$SetupAction {
     } else {
       await globalState.safeRun(() => applyProfile(force: true));
     }
+  }
+
+  void adoptNativeStopped() {
+    if (!system.isIOS) return;
+    _latestRunRequest = null;
+    _setLocalRunning(false);
+    ref.read(runningVpnOptionsProvider.notifier).value = null;
   }
 
   Future<bool> setRunning(bool running, {bool initialize = false}) {
@@ -280,6 +306,12 @@ class SetupAction extends _$SetupAction {
 
   /// An excluded SSID parks the listener without ending the run.
   void syncSuspend() {
+    // On iOS the packet tunnel owns the live core. Suspending the Flutter
+    // listener when the app changes lifecycle/network state calls stopListener
+    // and tears down the VPN while the extension is still healthy.
+    if (system.isIOS) {
+      return;
+    }
     debouncer.call(FunctionTag.suspend, () {
       return _listenerScheduler.run(() async {
         if (!ref.read(isStartProvider) || ref.read(safeModeProvider)) {

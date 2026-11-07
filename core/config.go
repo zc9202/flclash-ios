@@ -160,6 +160,13 @@ func applyConfig(params *SetupParams) error {
 		cfg = fallback
 	}
 
+	appliedDelayDigest = ""
+	preparedDelayDigest = ""
+	if err == nil {
+		if data, readErr := os.ReadFile(filepath.Join(constant.Path.HomeDir(), "config.yaml")); readErr == nil {
+			appliedDelayDigest = delayConfigDigest(data)
+		}
+	}
 	currentConfig = cfg
 	hub.ApplyConfig(cfg)
 	patchSelectGroup(params.SelectedMap)

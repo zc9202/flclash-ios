@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
@@ -11,17 +12,50 @@ typedef IpQualityFailure = ({
   IpQualitySourceStatus status,
 });
 
+enum IpQualityFailurePhase { request, response, decode, parse }
+
+class IpQualityFailureDetail {
+  const IpQualityFailureDetail({
+    required this.phase,
+    this.httpStatus,
+    this.dioType,
+    this.exceptionType,
+    this.osErrorCode,
+  });
+
+  final IpQualityFailurePhase phase;
+  final int? httpStatus;
+  final DioExceptionType? dioType;
+  final String? exceptionType;
+  final int? osErrorCode;
+
+  String get summary => [
+    'phase=${phase.name}',
+    if (httpStatus != null) 'httpStatus=$httpStatus',
+    if (dioType != null) 'dioType=${dioType!.name}',
+    if (exceptionType != null) 'exceptionType=$exceptionType',
+    if (osErrorCode != null) 'osErrorCode=$osErrorCode',
+  ].join(' ');
+}
+
 class IpQualityLookupException implements Exception {
-  const IpQualityLookupException(this.failures);
+  const IpQualityLookupException(
+    this.failures, {
+    this.details = const {},
+  });
 
   final List<IpQualityFailure> failures;
+  final Map<IpQualitySource, IpQualityFailureDetail> details;
 }
 
 class _SourceFailure implements Exception {
-  const _SourceFailure(this.status);
+  const _SourceFailure(this.status, [this.detail]);
 
   final IpQualitySourceStatus status;
+  final IpQualityFailureDetail? detail;
 }
+
+typedef IpQualityFetch = Future<ProbeResult?> Function(ProbeParams params);
 
 typedef _Answer = ({IpQuality quality, bool inferred});
 
@@ -40,34 +74,51 @@ Future<IpQuality> lookupIpQuality(
   required CancelToken cancelToken,
   Duration timeout = const Duration(seconds: 8),
   Duration hedge = const Duration(seconds: 1),
+  IpQualityFetch? fetch,
 }) {
-  return _Lookup(dio, ip, cancelToken, timeout, hedge).run();
+  return _Lookup(dio, ip, cancelToken, timeout, hedge, fetch).run();
 }
 
 class _Lookup {
-  _Lookup(this.dio, this.ip, this.cancelToken, this.timeout, this.hedge);
+  _Lookup(this.dio, this.ip, this.cancelToken, this.timeout, this.hedge, this.fetch);
 
   final Dio dio;
   final String ip;
   final CancelToken cancelToken;
   final Duration timeout;
   final Duration hedge;
+  final IpQualityFetch? fetch;
 
   final _completer = Completer<IpQuality>();
   final _failures = <IpQualityFailure>[];
+  final _details = <IpQualitySource, IpQualityFailureDetail>{};
   IpQuality? _fallback;
   int _wave = 0;
   int _inFlight = 0;
   Timer? _timer;
 
+  bool get _stopped => _completer.isCompleted || cancelToken.isCancelled;
+
+  void _cancel(DioException error) {
+    _timer?.cancel();
+    if (!_completer.isCompleted) {
+      _completer.completeError(error);
+    }
+  }
+
   Future<IpQuality> run() {
-    _launch();
+    unawaited(cancelToken.whenCancel.then(_cancel));
+    if (cancelToken.isCancelled) {
+      _cancel(cancelToken.cancelError!);
+    } else {
+      _launch();
+    }
     return _completer.future;
   }
 
   void _launch() {
     _timer?.cancel();
-    if (_completer.isCompleted) {
+    if (_stopped) {
       return;
     }
     if (_wave == _waves.length) {
@@ -84,6 +135,7 @@ class _Lookup {
           ip,
           cancelToken,
           timeout,
+          fetch,
         ).then(_onAnswer, onError: (Object error) => _onError(source, error)),
       );
     }
@@ -94,7 +146,7 @@ class _Lookup {
 
   void _onAnswer(_Answer answer) {
     _inFlight--;
-    if (_completer.isCompleted) {
+    if (_stopped) {
       return;
     }
     if (answer.inferred) {
@@ -109,10 +161,13 @@ class _Lookup {
 
   void _onError(IpQualitySource source, Object error) {
     _inFlight--;
-    if (_completer.isCompleted) {
+    if (_stopped) {
       return;
     }
     _failures.add((source: source, status: _statusOf(error)));
+    _details[source] = error is _SourceFailure && error.detail != null
+        ? error.detail!
+        : const IpQualityFailureDetail(phase: IpQualityFailurePhase.request);
     _advance();
   }
 
@@ -132,7 +187,9 @@ class _Lookup {
       return;
     }
     _failures.sort((a, b) => a.source.index.compareTo(b.source.index));
-    _completer.completeError(IpQualityLookupException(_failures));
+    _completer.completeError(
+      IpQualityLookupException(_failures, details: Map.unmodifiable(_details)),
+    );
   }
 }
 
@@ -142,29 +199,81 @@ Future<_Answer> _query(
   String ip,
   CancelToken cancelToken,
   Duration timeout,
+  IpQualityFetch? fetch,
 ) async {
-  final response = await dio
-      .get<String>(
-        _urlOf(source, ip),
-        cancelToken: cancelToken,
-        options: Options(
-          responseType: ResponseType.plain,
-          validateStatus: (_) => true,
-        ),
-      )
-      .timeout(timeout);
-  if (response.statusCode == HttpStatus.tooManyRequests) {
-    throw const _SourceFailure(IpQualitySourceStatus.rateLimited);
+  var phase = IpQualityFailurePhase.request;
+  int? httpStatus;
+  try {
+    if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+    final url = _urlOf(source, ip);
+    final pending = fetch == null
+        ? dio.get<String>(
+            url,
+            cancelToken: cancelToken,
+            options: Options(
+              responseType: ResponseType.plain,
+              validateStatus: (_) => true,
+            ),
+          )
+        : _fetchWithCore(fetch, url, timeout);
+    final response = await pending.timeout(timeout);
+    if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+    phase = IpQualityFailurePhase.response;
+    httpStatus = response.statusCode;
+    if (httpStatus == HttpStatus.tooManyRequests) {
+      throw const _SourceFailure(IpQualitySourceStatus.rateLimited);
+    }
+    if (httpStatus != HttpStatus.ok) {
+      throw const _SourceFailure(IpQualitySourceStatus.failed);
+    }
+    phase = IpQualityFailurePhase.decode;
+    final json = jsonDecode(response.data ?? '') as Map<String, dynamic>;
+    phase = IpQualityFailurePhase.parse;
+    final answer = _parse(source, ip, json);
+    if (answer == null) {
+      throw const _SourceFailure(IpQualitySourceStatus.noType);
+    }
+    return answer;
+  } catch (error) {
+    final dioError = error is DioException ? error : null;
+    final cause = dioError?.error ?? error;
+    throw _SourceFailure(
+      _statusOf(error),
+      IpQualityFailureDetail(
+        phase: phase,
+        httpStatus: httpStatus ?? dioError?.response?.statusCode,
+        dioType: dioError?.type,
+        exceptionType: cause is _SourceFailure ? null : '${cause.runtimeType}',
+        osErrorCode: cause is SocketException ? cause.osError?.errorCode : null,
+      ),
+    );
   }
-  if (response.statusCode != HttpStatus.ok) {
+}
+
+Future<Response<String>> _fetchWithCore(
+  IpQualityFetch fetch,
+  String url,
+  Duration timeout,
+) async {
+  final result = await fetch(
+    ProbeParams(
+      url: url,
+      headers: const {'User-Agent': browserUa},
+      timeout: timeout.inMilliseconds,
+      maxBody: 256 * 1024,
+    ),
+  );
+  if (result == null || result.error == 'timeout') {
+    throw const _SourceFailure(IpQualitySourceStatus.timeout);
+  }
+  if (result.error != null && result.error!.isNotEmpty) {
     throw const _SourceFailure(IpQualitySourceStatus.failed);
   }
-  final json = jsonDecode(response.data ?? '') as Map<String, dynamic>;
-  final answer = _parse(source, ip, json);
-  if (answer == null) {
-    throw const _SourceFailure(IpQualitySourceStatus.noType);
-  }
-  return answer;
+  return Response<String>(
+    requestOptions: RequestOptions(path: url),
+    statusCode: result.statusCode,
+    data: result.body,
+  );
 }
 
 IpQualitySourceStatus _statusOf(Object error) {

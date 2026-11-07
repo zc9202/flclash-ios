@@ -89,6 +89,15 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     _updateVisible(state);
     if (state == AppLifecycleState.resumed) {
+      if (system.isIOS && ref.read(initProvider)) {
+        ref.read(proxiesActionProvider.notifier).invalidateForResume();
+        final restored = await ref
+            .read(setupActionProvider.notifier)
+            .restoreIOSRunningState();
+        if (restored) {
+          await ref.read(proxiesActionProvider.notifier).updateGroups();
+        }
+      }
       unawaited(ref.read(locationPermissionsProvider.notifier).refresh());
       // A certificate removed meanwhile stops decryption before the next start.
       if (mitmFeature && ref.read(patchClashConfigProvider).mitm.enable) {

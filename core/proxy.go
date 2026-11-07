@@ -84,6 +84,8 @@ func proxyGroupNames(
 }
 
 func handleGetProxies() ProxiesData {
+	configMu.Lock()
+	defer configMu.Unlock()
 	proxies := tunnel.AllProxies()
 
 	names := proxyGroupNames(config.GetProxyNameList(), func(name string) (constant.AdapterType, bool) {

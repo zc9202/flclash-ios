@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -91,7 +92,284 @@ class _Adapter implements HttpClientAdapter {
   );
 }
 
+class _SensitiveSocketException extends SocketException {
+  const _SensitiveSocketException()
+    : super(
+        _DiagnosticAdapter.secret,
+        osError: const OSError(_DiagnosticAdapter.secret, 61),
+      );
+
+  @override
+  String toString() => throw StateError('Exception text must not be read');
+}
+
+class _DiagnosticAdapter implements HttpClientAdapter {
+  static const secret = 'http://proxy-user:proxy-password@proxy.invalid';
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return switch (options.uri.host) {
+      'ident.me' => throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.connectionError,
+        message: secret,
+        error: const _SensitiveSocketException(),
+      ),
+      'ip-api.com' => ResponseBody.fromString(secret, 503),
+      'api.ipquery.io' => ResponseBody.fromString(secret, 200),
+      'iplocate.io' => ResponseBody.fromString('[]', 200),
+      'api.ipapi.is' => ResponseBody.fromString('{}', 200),
+      _ => ResponseBody.fromString(secret, 429),
+    };
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
+  group('Core transport', () {
+    late Dio dio;
+
+    setUp(() {
+      dio = Dio()..httpClientAdapter = _Adapter({});
+    });
+    tearDown(() => dio.close());
+
+    test('parses type and organization without using Dio', () async {
+      final requests = <ProbeParams>[];
+      final quality = await lookupIpQuality(
+        dio,
+        _ip,
+        cancelToken: CancelToken(),
+        fetch: (params) async {
+          requests.add(params);
+          return ProbeResult(
+            statusCode: 200,
+            body: jsonEncode({
+              'ip': _ip,
+              'type': 'isp',
+              'aso': 'Core Broadband',
+              'asn': 64500,
+            }),
+          );
+        },
+      );
+      expect(quality.type, IpType.residential);
+      expect(quality.organization, 'Core Broadband');
+      expect(quality.asn, 64500);
+      expect((dio.httpClientAdapter as _Adapter).requested, isEmpty);
+      expect(requests.first.url, 'https://ident.me/json');
+      expect(requests.first.timeout, 8000);
+      expect(requests.first.maxBody, 256 * 1024);
+      expect(requests.first.proxyName, '');
+      expect(requests.first.headers['User-Agent'], isNotEmpty);
+    });
+
+    for (final (label, reply, status) in [
+      (
+        'HTTP 502',
+        const ProbeResult(statusCode: 502),
+        IpQualitySourceStatus.failed,
+      ),
+      (
+        'HTTP 429',
+        const ProbeResult(statusCode: 429),
+        IpQualitySourceStatus.rateLimited,
+      ),
+      (
+        'timeout',
+        const ProbeResult(error: 'timeout'),
+        IpQualitySourceStatus.timeout,
+      ),
+      ('no slot', null, IpQualitySourceStatus.timeout),
+      (
+        'failed',
+        const ProbeResult(error: 'failed', message: _DiagnosticAdapter.secret),
+        IpQualitySourceStatus.failed,
+      ),
+      (
+        'unknown error',
+        const ProbeResult(error: _DiagnosticAdapter.secret),
+        IpQualitySourceStatus.failed,
+      ),
+    ]) {
+      test('classifies $label without exposing Core messages', () async {
+        try {
+          await lookupIpQuality(
+            dio,
+            _ip,
+            cancelToken: CancelToken(),
+            fetch: (_) async => reply,
+          );
+          fail('Expected lookup failure');
+        } on IpQualityLookupException catch (error) {
+          expect(error.failures, hasLength(6));
+          expect(error.failures.map((f) => f.status), everyElement(status));
+          for (final detail in error.details.values) {
+            expect(detail.summary, isNot(contains(_DiagnosticAdapter.secret)));
+            expect(
+              detail.httpStatus,
+              reply != null && reply.error == null ? reply.statusCode : null,
+            );
+          }
+        }
+      });
+    }
+
+    test('bounds a silent fetch with the lookup timeout', () async {
+      await expectLater(
+        lookupIpQuality(
+          dio,
+          _ip,
+          cancelToken: CancelToken(),
+          timeout: const Duration(milliseconds: 10),
+          fetch: (_) => Completer<ProbeResult?>().future,
+        ),
+        throwsA(
+          isA<IpQualityLookupException>().having(
+            (error) => error.failures.map((f) => f.status),
+            'statuses',
+            everyElement(IpQualitySourceStatus.timeout),
+          ),
+        ),
+      );
+    });
+
+    test('cancellation ignores late success and prevents later waves', () async {
+      final pending = Completer<ProbeResult?>();
+      final token = CancelToken();
+      var requests = 0;
+      final result = lookupIpQuality(
+        dio,
+        _ip,
+        cancelToken: token,
+        hedge: const Duration(milliseconds: 10),
+        fetch: (_) {
+          requests++;
+          return pending.future;
+        },
+      );
+      final cancelled = expectLater(
+        result,
+        throwsA(
+          isA<DioException>().having(
+            (error) => error.type,
+            'type',
+            DioExceptionType.cancel,
+          ),
+        ),
+      );
+      token.cancel();
+      pending.complete(
+        ProbeResult(
+          statusCode: 200,
+          body: jsonEncode({'ip': _ip, 'type': 'isp'}),
+        ),
+      );
+      await cancelled;
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(requests, 3);
+    });
+
+    test('already cancelled lookup never starts a fetch', () async {
+      final token = CancelToken()..cancel();
+      var requests = 0;
+      await expectLater(
+        lookupIpQuality(
+          dio,
+          _ip,
+          cancelToken: token,
+          fetch: (_) async {
+            requests++;
+            return null;
+          },
+        ),
+        throwsA(isA<DioException>()),
+      );
+      expect(requests, 0);
+    });
+  });
+
+  test('keeps safe per-source diagnostics without proxy credentials', () async {
+    final dio = Dio()..httpClientAdapter = _DiagnosticAdapter();
+    addTearDown(dio.close);
+    try {
+      await lookupIpQuality(dio, _ip, cancelToken: CancelToken());
+      fail('Expected every source to fail');
+    } on IpQualityLookupException catch (error) {
+      expect(error.failures, hasLength(6));
+      final failures = {for (final f in error.failures) f.source: f};
+      final details = error.details;
+      expect(details, hasLength(6));
+      final connection = details[IpQualitySource.identMe]!;
+      expect(
+        failures[IpQualitySource.identMe]!.status,
+        IpQualitySourceStatus.failed,
+      );
+      expect(connection.phase, IpQualityFailurePhase.request);
+      expect(connection.httpStatus, isNull);
+      expect(connection.dioType, DioExceptionType.connectionError);
+      expect(connection.exceptionType, '_SensitiveSocketException');
+      expect(connection.osErrorCode, 61);
+      final response = details[IpQualitySource.ipApiCom]!;
+      expect(
+        failures[IpQualitySource.ipApiCom]!.status,
+        IpQualitySourceStatus.failed,
+      );
+      expect(response.phase, IpQualityFailurePhase.response);
+      expect(response.httpStatus, 503);
+      final decode = details[IpQualitySource.ipQuery]!;
+      expect(
+        failures[IpQualitySource.ipQuery]!.status,
+        IpQualitySourceStatus.failed,
+      );
+      expect(decode.phase, IpQualityFailurePhase.decode);
+      expect(decode.httpStatus, 200);
+      expect(decode.exceptionType, 'FormatException');
+      expect(
+        details[IpQualitySource.ipLocate]!.phase,
+        IpQualityFailurePhase.decode,
+      );
+      final parse = details[IpQualitySource.ipApiIs]!;
+      expect(
+        failures[IpQualitySource.ipApiIs]!.status,
+        IpQualitySourceStatus.noType,
+      );
+      expect(parse.phase, IpQualityFailurePhase.parse);
+      expect(parse.httpStatus, 200);
+      expect(
+        failures[IpQualitySource.proxyCheck]!.status,
+        IpQualitySourceStatus.rateLimited,
+      );
+      for (final detail in details.values) {
+        final summary = detail.summary;
+        expect(summary, contains('phase=${detail.phase.name}'));
+        for (final sensitive in [
+          _DiagnosticAdapter.secret,
+          'proxy-user',
+          'proxy-password',
+          'proxy.invalid',
+          _ip,
+          ..._hosts.values,
+        ]) {
+          expect(summary, isNot(contains(sensitive)));
+        }
+      }
+      expect(connection.summary, contains('osErrorCode=61'));
+      expect(connection.summary, contains('dioType=connectionError'));
+      expect(
+        connection.summary,
+        contains('exceptionType=_SensitiveSocketException'),
+      );
+      expect(response.summary, contains('httpStatus=503'));
+    }
+  });
+
   final samples = <IpQualitySource, (Object, IpQuality)>{
     IpQualitySource.identMe: (
       {

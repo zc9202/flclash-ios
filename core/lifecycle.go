@@ -1,6 +1,9 @@
 package core
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -8,6 +11,7 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/adapter/inbound"
+	"github.com/metacubex/mihomo/component/profile/cachefile"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
@@ -25,9 +29,30 @@ var (
 	sdkVersion atomic.Int32
 )
 
+var appCachePath string
+
 func handleInit(params *InitParams) error {
 	configMu.Lock()
 	defer configMu.Unlock()
+	if params.CachePath != "" {
+		if !filepath.IsAbs(params.CachePath) {
+			return errors.New("cache path must be absolute")
+		}
+		if err := os.MkdirAll(filepath.Dir(params.CachePath), 0700); err != nil {
+			return err
+		}
+		if (isInit.Load() && constant.Path.Cache() != params.CachePath) || (appCachePath != "" && appCachePath != params.CachePath) {
+			return errors.New("cache path cannot change while the core is running")
+		}
+		if appCachePath == "" {
+			constant.SetCache(params.CachePath)
+			cache := cachefile.Cache()
+			if cache.DB == nil || cache.DB.Path() != params.CachePath {
+				return errors.New("cache database did not open at the requested path")
+			}
+			appCachePath = params.CachePath
+		}
+	}
 	sdkVersion.Store(int32(params.Version))
 	constant.SetHomeDir(params.HomeDir)
 	initOwnership(params.HomeDir)
@@ -99,6 +124,8 @@ func handleShutdown() {
 	updater.StopGeoUpdater()
 	executor.Shutdown()
 	currentConfig = nil
+	appliedDelayDigest = ""
+	preparedDelayDigest = ""
 	isInit.Store(false)
 	configMu.Unlock()
 
