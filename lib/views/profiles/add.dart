@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/scan.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -121,16 +119,6 @@ class AddProfileView extends ConsumerWidget {
     }
   }
 
-  void _toMerge(BuildContext context) {
-    showExtend(
-      context,
-      builder: (context) => CommonScaffold(
-        title: '聚合订阅',
-        body: _MergeSubscriptionForm(origin: origin),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appLocalizations = context.appLocalizations;
@@ -160,154 +148,6 @@ class AddProfileView extends ConsumerWidget {
           title: Text(appLocalizations.customProfile),
           subtitle: Text(appLocalizations.customProfileDesc),
           onTap: () => _toAddCustom(context, ref),
-        ),
-        ListItem(
-          leading: const GlyphIcon(AppGlyphs.layers),
-          title: const Text('聚合订阅'),
-          subtitle: const Text('把多个机场订阅合并成一个配置'),
-          onTap: () => _toMerge(context),
-        ),
-      ],
-    );
-  }
-}
-
-class _MergeSubscriptionForm extends ConsumerStatefulWidget {
-  final BuildContext origin;
-
-  const _MergeSubscriptionForm({required this.origin});
-
-  @override
-  ConsumerState<_MergeSubscriptionForm> createState() =>
-      _MergeSubscriptionFormState();
-}
-
-class _MergeSubscriptionFormState
-    extends ConsumerState<_MergeSubscriptionForm> {
-  final _groupName = TextEditingController();
-  final _selected = <int>{};
-  var _busy = false;
-
-  @override
-  void dispose() {
-    _groupName.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit(BuildContext context) async {
-    final groupName = _groupName.text.trim();
-    if (groupName.isEmpty || _selected.isEmpty) {
-      dialogs.showMessage(
-        context: context,
-        title: '信息不完整',
-        message: const TextSpan(text: '请填写组名，并勾选至少一个订阅'),
-      );
-      return;
-    }
-    setState(() {
-      _busy = true;
-    });
-    try {
-      final profile = await ref
-          .read(profilesActionProvider.notifier)
-          .createMergedSubscription(
-        groupName: groupName,
-        profileIds: _selected.toList(),
-      );
-      if (!mounted) {
-        return;
-      }
-      final navigator = Navigator.of(context);
-      navigator.pop();
-      if (widget.origin.mounted) {
-        unawaited(BaseNavigator.push(
-          widget.origin,
-          CustomProfileView(profileId: profile.id),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        dialogs.showMessage(
-          context: context,
-          title: '创建失败',
-          message: TextSpan(text: compactError(e)),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final profiles = ref.watch(profilesProvider);
-    final subscriptions = [
-      for (final profile in profiles)
-        if (profile.type != ProfileType.custom) profile,
-    ];
-    return ListView(
-      padding: EdgeInsets.only(
-        top: context.contentTopPadding,
-        left: 16,
-        right: 16,
-        bottom: 16,
-      ),
-      children: [
-        TextField(
-          controller: _groupName,
-          decoration: const InputDecoration(labelText: '聚合组名称'),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '选择要合并的订阅（${_selected.length} 个）',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        const SizedBox(height: 4),
-        if (subscriptions.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              '还没有订阅，请先在配置页添加机场订阅',
-              textAlign: TextAlign.center,
-            ),
-          )
-        else
-          ...subscriptions.map(
-            (profile) => ListItem.toggle(
-              key: ValueKey(profile.id),
-              title: Text(profile.realLabel),
-              subtitle: profile.subscriptionInfo == null
-                  ? null
-                  : Text(
-                      '${profile.subscriptionInfo!.upload.traffic.show} ↑ / '
-                      '${profile.subscriptionInfo!.download.traffic.show} ↓ · '
-                      '${profile.subscriptionInfo!.expire == 0 ? '长期' : DateTime.fromMillisecondsSinceEpoch(profile.subscriptionInfo!.expire * 1000).show}',
-                    ),
-              value: _selected.contains(profile.id),
-              onChanged: (value) {
-                setState(() {
-                  if (value) {
-                    _selected.add(profile.id);
-                  } else {
-                    _selected.remove(profile.id);
-                  }
-                });
-              },
-            ),
-          ),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: _busy ? null : () => _submit(context),
-          child: Text(_busy ? '创建中…' : '创建聚合订阅'),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          '将从已勾选的订阅中合并全部节点到一个组',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
       ],
     );

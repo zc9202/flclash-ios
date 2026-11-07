@@ -213,48 +213,6 @@ class ProfilesAction extends _$ProfilesAction {
     return profile.id;
   }
 
-  /// Builds a custom profile whose single group aggregates the selected
-  /// existing subscriptions, like a merged feed (sub store style).
-  Future<Profile> createMergedSubscription({
-    required String groupName,
-    required List<int> profileIds,
-  }) async {
-    final profiles = ref.read(profilesProvider);
-    final selected = <Profile>[
-      for (final id in profileIds)
-        if (profiles.getProfile(id) case final p?
-            when p.type != ProfileType.custom)
-          p,
-    ];
-    if (selected.isEmpty) {
-      throw const FormatException('没有选中的订阅');
-    }
-    final labels = <String>{};
-    final use = <String>[
-      for (final p in selected)
-        if (labels.add(p.realLabel)) p.realLabel,
-    ];
-    final merged = Profile.custom(label: groupName);
-    putProfile(merged);
-    await database.proxyGroupsDao.order(
-      merged.id,
-      proxyGroup: ProxyGroup(
-        id: snowflake.id,
-        name: groupName,
-        type: GroupType.Selector,
-        use: use,
-      ),
-      order: '',
-    );
-    await database.rulesDao.putRule(
-      Rule.parse('MATCH,$groupName'),
-      profileId: merged.id,
-    );
-    ref.read(currentProfileIdProvider.notifier).value = merged.id;
-    ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
-    return merged;
-  }
-
   void touchProfile(int id) {
     final profile = ref.read(profilesProvider).getProfile(id);
     if (profile == null) return;
