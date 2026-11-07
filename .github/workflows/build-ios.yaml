@@ -157,10 +157,10 @@ jobs:
           if run_archive; then
             echo "ARCHIVED with the project's deployment targets" | tee "$RUNNER_TEMP/used-target.txt"
           else
-            grep -E "error:" "$RUNNER_TEMP/archive.log" | head -20 || true
+            grep -E "error|--> " "$RUNNER_TEMP/archive.log" | head -40 || true
             echo "=== retrying with IPHONEOS_DEPLOYMENT_TARGET=$DEPLOY_TARGET ==="
             if ! run_archive IPHONEOS_DEPLOYMENT_TARGET="$DEPLOY_TARGET"; then
-              grep -E "error:" "$RUNNER_TEMP/archive.log" | head -20 || true
+              grep -E "error|--> " "$RUNNER_TEMP/archive.log" | head -40 || true
               tail -60 "$RUNNER_TEMP/archive.log" || true
               exit 1
             fi
