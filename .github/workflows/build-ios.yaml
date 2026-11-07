@@ -117,9 +117,9 @@ jobs:
       # Generate Generated.xcconfig / flutter_export_environment.sh only. The
       # real build is the archive step below, which runs Flutter's own build
       # phases and prints the diagnostics `flutter build ios` swallows.
-      - name: Check iOS Rust editor library
+      - name: Build iOS Rust editor library (fail fast)
         run: |
-          rustup run 1.99.0 cargo check \
+          rustup run 1.99.0 cargo build --release \
             --manifest-path plugins/rust_api/rust/Cargo.toml \
             --package rust_api --target aarch64-apple-ios
 
