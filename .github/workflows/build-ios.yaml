@@ -126,6 +126,8 @@ jobs:
       # phases and prints the diagnostics `flutter build ios` swallows.
       - name: Build iOS Rust editor library (fail fast)
         run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add aarch64-apple-ios-sim
           rustup run 1.99.0 cargo build --release \
             --manifest-path plugins/rust_api/rust/Cargo.toml \
             --package rust_api --target aarch64-apple-ios
