@@ -99,7 +99,7 @@ jobs:
           rm -rf .dart_tool/hooks_runner
       - name: Verify download speed test
         run: |
-          dart analyze --no-fatal-infos --no-fatal-warnings lib
+          dart analyze --no-fatal-warnings lib
           cd core
           go test -run 'Test(RunProbeMeasuresBodyWithoutReturningIt|RunProbeFollowsRedirectsAndCapsTheBody|ReadProbeBody)' -count=1 .
 
