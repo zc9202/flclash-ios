@@ -41,6 +41,10 @@ env:
   BUNDLE_ID: ${{ github.event.inputs.bundle_id || 'com.follow.clash' }}
   DEPLOY_TARGET: ${{ github.event.inputs.deployment_target || '15.0' }}
   IPHONEOS_DEPLOYMENT_TARGET: ${{ github.event.inputs.deployment_target || '15.0' }}
+  # rquickjs_sys 编译出的 C 对象按当前 SDK 的 min version 处理，而 Cargo
+  # 的 aarch64-apple-ios 目标默认只链接到 10.0，导致符号缺失。给 linker 显式
+  # 传同一个 deployment target，并让 hooks_runner 缓存失效。
+  RUSTFLAGS: '-C link-arg=-mios-version-min=${{ github.event.inputs.deployment_target || '15.0' }}'
 
 jobs:
   ipa:
@@ -129,6 +133,7 @@ jobs:
           rustup toolchain install 1.99.0-aarch64-apple-darwin --profile minimal
           rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios
           rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios-sim
+          rm -rf .dart_tool/hooks_runner
           rustup run 1.99.0-aarch64-apple-darwin cargo build --release \
             --manifest-path plugins/rust_api/rust/Cargo.toml \
             --package rust_api --target aarch64-apple-ios
