@@ -41,6 +41,23 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   ) {
     final appLocalizations = context.appLocalizations;
     return [
+      if (style.type == ProxiesType.tab)
+        PopupMenuItem(
+          glyph: AppGlyphs.speed,
+          label: appLocalizations.downloadSpeedTest,
+          section: const PopupMenuSection(),
+          onPressed: () {
+            final groupName = ref.read(
+              proxiesTabControllerStateProvider.select(
+                (state) => state.currentGroupName,
+              ),
+            );
+            if (groupName.isEmpty) return;
+            ref
+                .read(proxiesActionProvider.notifier)
+                .speedTestPageGroup(groupName, matchSearch: false);
+          },
+        ),
       _optionsMenuItem(
         glyph: AppGlyphs.appsList,
         label: appLocalizations.style,
