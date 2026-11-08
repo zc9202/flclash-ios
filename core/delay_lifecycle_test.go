@@ -40,7 +40,8 @@ func TestDelayPreparationAfterBootstrapStartAndVPNRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	currentConfig.General.MixedPort = port
-	if !handleStartListener() || !isRunning.Load() || listener.GetPorts().MixedPort != port {
+	handleStartListener()
+	if !isRunning.Load() || listener.GetPorts().MixedPort != port {
 		t.Fatal("bootstrap listener not running")
 	}
 	// The extension lives in another process; its read-only snapshot has this digest.
