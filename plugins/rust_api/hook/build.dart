@@ -9,11 +9,14 @@ void main(List<String> args) async {
       stdout.writeln('Skipping the Rust build: user-define build_assets=false');
       return;
     }
+    final rustEnvironment = {..._bindgenEnvironment(input)};
+    if (input.config.code.targetOS == OS.ios) {
+      rustEnvironment['RUSTFLAGS'] = '-C link-arg=-miphoneos-version-min=15.0';
+    }
     await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: 'rust',
-      extraCargoEnvironmentVariables: _bindgenEnvironment(input),
-    ).run(input: input, output: output);
-  });
+      extraCargoEnvironmentVariables: rustEnvironment,
+    ).run(input: input, output: output);  });
 }
 
 // rquickjs runs bindgen on Android, which must load the NDK's libclang; Linux

@@ -131,6 +131,8 @@ jobs:
       - name: Build iOS Rust editor library (fail fast)
         run: |
           rustup toolchain install 1.99.0-aarch64-apple-darwin --profile minimal
+          rustup component add --toolchain 1.99.0-aarch64-apple-darwin rustfmt
+          rustup component add --toolchain 1.99.0-aarch64-apple-darwin clippy
           rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios
           rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios-sim
           rm -rf .dart_tool/hooks_runner
@@ -148,6 +150,7 @@ jobs:
           DISABLE_SWIFTLINT: '1'
         run: |
           set -u
+          rm -rf .dart_tool/hooks_runner
           rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-* 2>/dev/null || true
           archive="$RUNNER_TEMP/FlClash.xcarchive"
 
