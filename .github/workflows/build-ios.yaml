@@ -40,6 +40,7 @@ env:
   GO_VERSION: '1.27.3'
   BUNDLE_ID: ${{ github.event.inputs.bundle_id || 'com.follow.clash' }}
   DEPLOY_TARGET: ${{ github.event.inputs.deployment_target || '15.0' }}
+  IPHONEOS_DEPLOYMENT_TARGET: ${{ github.event.inputs.deployment_target || '15.0' }}
 
 jobs:
   ipa:
