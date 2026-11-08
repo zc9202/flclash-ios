@@ -96,9 +96,10 @@ jobs:
       - name: Verify iOS shared-data migration
         run: |
           python3 -m unittest discover -s tool/ios -p 'test_*.py'
-          # Run the specific Dart tests directly so Flutter's platform
-          # native-assets hook does not build the Rust plugin here.
+          yq -i '.hooks.user_defines.setup.build_assets=false' pubspec.yaml
+          yq -i '.hooks.user_defines.rust_api.build_assets=false' pubspec.yaml
           dart test test/common/ios_data_migration_test.dart test/common/ip_quality_test.dart
+          git checkout -- pubspec.yaml
 
       # The setup hook only knows desktop and Android targets; the iOS core is
       # built by the Xcode Run Script phase (tool/ios/build_core.sh) instead.
