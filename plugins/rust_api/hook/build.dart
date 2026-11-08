@@ -17,7 +17,11 @@ void main(List<String> args) async {
     rustEnvironment['CFLAGS'] = '-miphoneos-version-min=15.0';
     rustEnvironment['CFLAGS_aarch64_apple_ios'] = '-miphoneos-version-min=15.0';
     rustEnvironment['CFLAGS_aarch64_apple_ios_sim'] = '-miphoneos-version-min=15.0';
-    rustEnvironment['RUSTFLAGS'] = '-C link-arg=-miphoneos-version-min=15.0';
+    // rustc reads IPHONEOS_DEPLOYMENT_TARGET for Apple targets; cargo otherwise
+    // links aarch64-apple-ios at 10.0 while our C objects are built at 15.0,
+    // which drops the dart_api_dl/oslog symbols. Setting it here makes rustc
+    // emit -target arm64-apple-ios15.0.0 and keeps cc in sync.
+    rustEnvironment['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0';
     await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: 'rust',
       extraCargoEnvironmentVariables: rustEnvironment,
