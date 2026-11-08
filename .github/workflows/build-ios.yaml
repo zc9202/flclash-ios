@@ -44,7 +44,7 @@ env:
   # rquickjs_sys 编译出的 C 对象按当前 SDK 的 min version 处理，而 Cargo
   # 的 aarch64-apple-ios 目标默认只链接到 10.0，导致符号缺失。给 linker 显式
   # 传同一个 deployment target，并让 hooks_runner 缓存失效。
-  RUSTFLAGS: -C link-arg=-mios-version-min=15.0
+  RUSTFLAGS: -C link-arg=-Wl,-mios-version-min=15.0
 
 jobs:
   ipa:
