@@ -10,9 +10,13 @@ void main(List<String> args) async {
       return;
     }
     final rustEnvironment = {..._bindgenEnvironment(input)};
-    // Flutter's hook-runner env strips the job's RUSTFLAGS; rquickjs_sys
-    // otherwise builds against a newer Xcode SDK than Cargo's default
-    // aarch64-apple-ios link target. Pin the clang min version here.
+    // Flutter's hook-runner env strips the job's CFLAGS/RUSTFLAGS. rquickjs_sys
+    // and dart_api otherwise compile Objective-C objects with the current Xcode
+    // SDK default, while Cargo's aarch64-apple-ios linker target defaults to a
+    // much older deployment version. Pin both compile and link phases here.
+    rustEnvironment['CFLAGS'] = '-miphoneos-version-min=15.0';
+    rustEnvironment['CFLAGS_aarch64_apple_ios'] = '-miphoneos-version-min=15.0';
+    rustEnvironment['CFLAGS_aarch64_apple_ios_sim'] = '-miphoneos-version-min=15.0';
     rustEnvironment['RUSTFLAGS'] = '-C link-arg=-miphoneos-version-min=15.0';
     await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: 'rust',
