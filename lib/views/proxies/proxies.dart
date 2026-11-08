@@ -52,7 +52,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                 (state) => state.currentGroupName,
               ),
             );
-            if (groupName.isEmpty) return;
+            if (groupName == null) return;
             ref
                 .read(proxiesActionProvider.notifier)
                 .speedTestPageGroup(groupName, matchSearch: false);
