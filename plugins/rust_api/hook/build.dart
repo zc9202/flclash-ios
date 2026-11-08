@@ -10,9 +10,10 @@ void main(List<String> args) async {
       return;
     }
     final rustEnvironment = {..._bindgenEnvironment(input)};
-    if (input.config.code.targetOS == OS.ios) {
-      rustEnvironment['RUSTFLAGS'] = '-C link-arg=-miphoneos-version-min=15.0';
-    }
+    // Flutter's hook-runner env strips the job's RUSTFLAGS; rquickjs_sys
+    // otherwise builds against a newer Xcode SDK than Cargo's default
+    // aarch64-apple-ios link target. Pin the clang min version here.
+    rustEnvironment['RUSTFLAGS'] = '-C link-arg=-miphoneos-version-min=15.0';
     await FlutterRustBridgeNativeAssetsBuilder(
       cratePath: 'rust',
       extraCargoEnvironmentVariables: rustEnvironment,
