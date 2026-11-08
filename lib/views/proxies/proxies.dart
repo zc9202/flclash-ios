@@ -145,22 +145,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     );
   }
 
-  IconButtonData? _buildSpeedAction() {
-    if (!_isTab) return null;
-    final currentGroupName = ref.watch(
-      proxiesTabControllerStateProvider.select((state) => state.currentGroupName),
-    );
-    final testing = ref.watch(
-      speedTestingGroupsProvider.select((state) => state.contains(currentGroupName)),
-    );
-    return IconButtonData(
-      glyph: AppGlyphs.speed,
-      onPressed: () => _proxiesTabKey.currentState?.speedTestCurrentGroup(),
-      tooltip: context.appLocalizations.downloadSpeedTest,
-      isLoading: testing,
-    );
-  }
-
   void _onSearch(String value) {
     ref.read(queryProvider(QueryTag.proxies).notifier).value = value;
   }
@@ -195,7 +179,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       primaryAction: primaryAction,
       searchActions: [?primaryAction],
       iconActions: [
-        if (_isTab && !picker) ?_buildSpeedAction(),
         if (_isTab && !picker)
           IconButtonData(
             glyph: AppGlyphs.locate,
