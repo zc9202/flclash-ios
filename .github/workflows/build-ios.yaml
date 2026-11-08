@@ -88,12 +88,16 @@ jobs:
           test "$count" -ge 100
 
       - name: Flutter dependencies
-        run: flutter pub get
-
+        run: |
+          flutter pub get
+          # DerivedData is stale across CI VMs; the macOS Rust toolchain is not
+          # even present. Clear first so no platform hook output leaks in.
+          rm -rf .dart_tool/hooks_runner
       - name: Verify iOS shared-data migration
         run: |
           python3 -m unittest discover -s tool/ios -p 'test_*.py'
-          flutter test test/common/ios_data_migration_test.dart test/common/ip_quality_test.dart
+          flutter test test/common/ios_data_migration_test.dart test/common/ip_quality_test.dart \
+            --define build_assets=false
 
       # The setup hook only knows desktop and Android targets; the iOS core is
       # built by the Xcode Run Script phase (tool/ios/build_core.sh) instead.
@@ -136,16 +140,6 @@ jobs:
           set -u
           rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-* 2>/dev/null || true
           archive="$RUNNER_TEMP/FlClash.xcarchive"
-
-          # release build: clear stale Flutter native-assets hook cache first
-          echo '=== Clearing stale Flutter native-assets hook cache ==='
-          rm -rf "$RUNNER_WORKSPACE/.dart_tool/hooks_runner"
-
-          # native-assets hook uses macOS target; existing builds must not link
-          # the iOS part if their stale cache triggers mixed platform objects
-          if [[ "$CONFIGURATION" == Release ]]; then
-            rm -rf "$RUNNER_WORKSPACE/.dart_tool/hooks_runner"
-          fi
 
           # The project's own targets are the wanted ones: app and tunnel at
           # 15.0, widget at 17.0 (its SwiftUI APIs need it). Overriding the
