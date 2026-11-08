@@ -97,6 +97,24 @@ func TestRunProbeFollowsRedirectsAndCapsTheBody(t *testing.T) {
 	}
 }
 
+func TestRunProbeMeasuresBodyWithoutReturningIt(t *testing.T) {
+	server := probeServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(strings.Repeat("x", 100)))
+	})
+	withProbeProxies(t, "node-a")
+
+	result := runProbe(context.Background(), probeRequest{
+		url: server.URL, proxyName: "node-a", timeout: 2 * time.Second,
+		maxBody: 8, measureOnly: true,
+	})
+	if result == nil || result.Error != "" {
+		t.Fatalf("result = %+v, want a success", result)
+	}
+	if result.Bytes != 8 || result.Body != "" {
+		t.Errorf("bytes = %d, body = %q; want 8 bytes without a retained body", result.Bytes, result.Body)
+	}
+}
+
 func TestReadProbeBodyStopsOnceTheMarkerArrives(t *testing.T) {
 	marker := "\"currentTerritory\":\"JP\""
 	page := strings.Repeat("x", probeScanChunk-10) + marker + strings.Repeat("y", 4*probeScanChunk)

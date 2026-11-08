@@ -23,12 +23,13 @@ double getItemHeight(ProxyCardType proxyCardType) {
       measure.textHeight(AppTextStyle.footnote) +
       8 +
       4;
+  final speedLine = measure.textHeight(AppTextStyle.caption2) + 4;
   return switch (proxyCardType) {
     ProxyCardType.loose =>
-      baseHeight + measure.textHeight(AppTextStyle.caption2) + 6,
-    ProxyCardType.standard => baseHeight,
+      baseHeight + speedLine + measure.textHeight(AppTextStyle.caption2) + 6,
+    ProxyCardType.standard => baseHeight + speedLine,
     ProxyCardType.compact =>
-      baseHeight - measure.textHeight(AppTextStyle.subheadline),
+      baseHeight - measure.textHeight(AppTextStyle.subheadline) + speedLine,
   };
 }
 

@@ -231,13 +231,14 @@ func probeErrorKind(err error) string {
 }
 
 type probeRequest struct {
-	method    string
-	url       string
-	proxyName string
-	headers   map[string]string
-	body      []byte
-	timeout   time.Duration
-	maxBody   int64
+	method      string
+	url         string
+	proxyName   string
+	headers     map[string]string
+	body        []byte
+	timeout     time.Duration
+	maxBody     int64
+	measureOnly bool
 
 	// A followed redirect loses the Location that Netflix names its region in.
 	noRedirect bool
@@ -251,6 +252,8 @@ type probeRequest struct {
 type ProbeResult struct {
 	StatusCode   int      `json:"status-code"`
 	Delay        int64    `json:"delay"`
+	Bytes        int64    `json:"bytes,omitempty"`
+	Duration     int64    `json:"duration,omitempty"`
 	Body         string   `json:"body"`
 	Url          string   `json:"url"`
 	Chains       []string `json:"chains"`
@@ -268,12 +271,13 @@ type ProbeResult struct {
 
 func handleProbe(params *ProbeParams) *ProbeResult {
 	return runProbe(context.Background(), probeRequest{
-		method:    http.MethodGet,
-		url:       params.Url,
-		proxyName: params.ProxyName,
-		headers:   params.Headers,
-		timeout:   timeoutFromMillis(params.Timeout, defaultProbeTimeout),
-		maxBody:   params.MaxBody,
+		method:      http.MethodGet,
+		url:         params.Url,
+		proxyName:   params.ProxyName,
+		headers:     params.Headers,
+		timeout:     timeoutFromMillis(params.Timeout, defaultProbeTimeout),
+		maxBody:     params.MaxBody,
+		measureOnly: params.MeasureOnly,
 	})
 }
 
@@ -365,7 +369,21 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 		result.RulePayload = route.rulePayload
 	}
 	if req.maxBody > 0 {
-		result.Body = readProbeBody(response.Body, req.maxBody, req.until)
+		readStart := time.Now()
+		if req.measureOnly {
+			// Discard the payload: a binary speed-test response can be several MB
+			// and must not be serialized across the iOS extension boundary.
+			var readErr error
+			result.Bytes, readErr = io.Copy(io.Discard, io.LimitReader(response.Body, req.maxBody))
+			result.Duration = time.Since(readStart).Milliseconds()
+			if readErr != nil {
+				return fail(readErr)
+			}
+		} else {
+			result.Body = readProbeBody(response.Body, req.maxBody, req.until)
+			result.Bytes = int64(len(result.Body))
+			result.Duration = time.Since(readStart).Milliseconds()
+		}
 	}
 	return result
 }

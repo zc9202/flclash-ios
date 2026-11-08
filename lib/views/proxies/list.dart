@@ -606,6 +606,9 @@ class ListHeader extends ConsumerWidget {
     final isDelayTesting = ref.watch(
       delayTestingGroupsProvider.select((state) => state.contains(groupName)),
     );
+    final isSpeedTesting = ref.watch(
+      speedTestingGroupsProvider.select((state) => state.contains(groupName)),
+    );
     final colorScheme = context.colorScheme;
     final level = floating > 0
         ? SurfaceLevel.floatingOf(colorScheme)
@@ -632,6 +635,7 @@ class ListHeader extends ConsumerWidget {
             _GroupActions(
               isExpand: isExpand,
               isDelayTesting: isDelayTesting,
+              isSpeedTesting: isSpeedTesting,
               groupType: group.type.name,
               onScrollToSelected: () {
                 onScrollToSelected(groupName);
@@ -640,6 +644,9 @@ class ListHeader extends ConsumerWidget {
                 ref
                     .read(proxiesActionProvider.notifier)
                     .delayTestPageGroup(groupName);
+              },
+              onSpeedTest: () {
+                ref.read(proxiesActionProvider.notifier).speedTestPageGroup(groupName);
               },
               onToggle: () {
                 onChange(groupName);
@@ -805,17 +812,21 @@ class _GroupActions extends StatelessWidget {
   const _GroupActions({
     required this.isExpand,
     required this.isDelayTesting,
+    required this.isSpeedTesting,
     required this.groupType,
     required this.onScrollToSelected,
     required this.onDelayTest,
+    required this.onSpeedTest,
     required this.onToggle,
   });
 
   final bool isExpand;
   final bool isDelayTesting;
+  final bool isSpeedTesting;
   final String groupType;
   final VoidCallback onScrollToSelected;
   final VoidCallback onDelayTest;
+  final VoidCallback onSpeedTest;
   final VoidCallback onToggle;
 
   @override
@@ -840,6 +851,13 @@ class _GroupActions extends StatelessWidget {
                   icon: isDelayTesting
                       ? const ActivityIndicator(size: 24)
                       : const GlyphIcon(AppGlyphs.bolt),
+                ),
+                IconButton(
+                  tooltip: context.appLocalizations.downloadSpeedTest,
+                  onPressed: isSpeedTesting ? null : onSpeedTest,
+                  icon: isSpeedTesting
+                      ? const ActivityIndicator(size: 24)
+                      : const GlyphIcon(AppGlyphs.speed),
                 ),
               ],
             )

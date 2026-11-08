@@ -4556,6 +4556,16 @@ class AppLocalizations {
     return Intl.message('Add profile', name: 'addProfile', desc: '', args: []);
   }
 
+  /// `Download speed test`
+  String get downloadSpeedTest {
+    return Intl.message(
+      'Download speed test',
+      name: 'downloadSpeedTest',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Delay test`
   String get delayTest {
     return Intl.message('Delay test', name: 'delayTest', desc: '', args: []);

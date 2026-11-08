@@ -105,6 +105,12 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
         .delayTestPageGroup(group.name);
   }
 
+  Future<void> speedTestCurrentGroup() async {
+    final group = currentGroup;
+    if (group == null) return;
+    await ref.read(proxiesActionProvider.notifier).speedTestPageGroup(group.name);
+  }
+
   Group? get currentGroup {
     return _getGroup(_tabController?.index);
   }

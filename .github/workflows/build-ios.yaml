@@ -97,6 +97,12 @@ jobs:
           # DerivedData is stale across CI VMs; the macOS Rust toolchain is not
           # even present. Clear first so no platform hook output leaks in.
           rm -rf .dart_tool/hooks_runner
+      - name: Verify download speed test
+        run: |
+          dart analyze --no-fatal-infos --no-fatal-warnings lib
+          cd core
+          go test -run 'Test(RunProbeMeasuresBodyWithoutReturningIt|RunProbeFollowsRedirectsAndCapsTheBody|ReadProbeBody)' -count=1 .
+
       - name: Verify iOS shared-data migration
         run: |
           python3 -m unittest discover -s tool/ios -p 'test_*.py'

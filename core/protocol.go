@@ -274,11 +274,12 @@ type Delay struct {
 }
 
 type ProbeParams struct {
-	Url       string            `json:"url"`
-	ProxyName string            `json:"proxy-name"`
-	Headers   map[string]string `json:"headers"`
-	Timeout   int64             `json:"timeout"`
-	MaxBody   int64             `json:"max-body"`
+	Url         string            `json:"url"`
+	ProxyName   string            `json:"proxy-name"`
+	Headers     map[string]string `json:"headers"`
+	Timeout     int64             `json:"timeout"`
+	MaxBody     int64             `json:"max-body"`
+	MeasureOnly bool              `json:"measure-only,omitempty"`
 }
 
 type Traffic struct {

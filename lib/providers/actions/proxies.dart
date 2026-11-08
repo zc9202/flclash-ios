@@ -30,6 +30,8 @@ class ProxiesAction extends _$ProxiesAction {
   final Map<String, int> _generationByKey = {};
   int _resumeGeneration = 0;
   final TaskPool _delayTestPool = TaskPool(maxConcurrentDelayTests);
+  // Download tests consume bandwidth; avoid measuring every node at once.
+  final TaskPool _speedTestPool = TaskPool(4);
 
   final List<_DelayTestJob> _delayTestJobs = [];
 
@@ -359,6 +361,43 @@ class ProxiesAction extends _$ProxiesAction {
       );
     } finally {
       testing.stop(groupName);
+    }
+  }
+
+  Future<void> speedTestPageGroup(
+    String groupName, {
+    bool matchSearch = true,
+  }) async {
+    final group = ref.read(groupsProvider).getGroup(groupName);
+    if (group == null) return;
+    final speed = ref.read(proxySpeedProvider.notifier);
+    final testing = ref.read(speedTestingGroupsProvider.notifier);
+    if (!testing.start(groupName)) return;
+    try {
+      final query = SearchQuery(
+        matchSearch ? ref.read(queryProvider(QueryTag.proxies)) : '',
+      );
+      final proxies = group.all
+          .whereMatches(query, (proxy) => proxy.searchFields)
+          .toList();
+      await Future.wait(
+        proxies.map((proxy) => _speedTestPool.run(() => speed.test(proxy))),
+      );
+      if (!ref.mounted) return;
+      final fastest = speed.fastestAmong(proxies.map((proxy) => proxy.name));
+      if (fastest == null) {
+        dialogs.showBanner(
+          '${currentAppLocalizations.downloadSpeedTest} ${currentAppLocalizations.serviceFailed}',
+          level: BannerLevel.error,
+        );
+      } else {
+        dialogs.showBanner(
+          '${currentAppLocalizations.downloadSpeedTest} ${currentAppLocalizations.done}: ${fastest.formatted}',
+          level: BannerLevel.success,
+        );
+      }
+    } finally {
+      if (ref.mounted) testing.stop(groupName);
     }
   }
 

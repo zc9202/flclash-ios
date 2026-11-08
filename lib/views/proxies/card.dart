@@ -221,11 +221,37 @@ class ProxyCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 details,
+                const SizedBox(height: 4),
+                _SpeedText(proxyName: proxy.name),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _SpeedText extends ConsumerWidget {
+  const _SpeedText({required this.proxyName});
+
+  final String proxyName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entry = ref.watch(proxySpeedProvider.select((state) => state[proxyName]));
+    return SizedBox(
+      height: globalState.measure.textHeight(AppTextStyle.caption2),
+      child: entry == null
+          ? null
+          : Text(
+              entry.formatted,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyle.caption2.of(context).copyWith(
+                color: context.colorScheme.onSurfaceVariant.opacity60,
+              ),
+            ),
     );
   }
 }
