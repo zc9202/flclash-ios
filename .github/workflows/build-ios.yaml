@@ -98,7 +98,7 @@ jobs:
           python3 -m unittest discover -s tool/ios -p 'test_*.py'
           yq -i '.hooks.user_defines.setup.build_assets=false' pubspec.yaml
           yq -i '.hooks.user_defines.rust_api.build_assets=false' pubspec.yaml
-          dart test test/common/ios_data_migration_test.dart test/common/ip_quality_test.dart
+          flutter test test/common/ios_data_migration_test.dart test/common/ip_quality_test.dart
           git checkout -- pubspec.yaml
 
       # The setup hook only knows desktop and Android targets; the iOS core is
