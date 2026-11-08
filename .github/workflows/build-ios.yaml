@@ -127,8 +127,8 @@ jobs:
       - name: Build iOS Rust editor library (fail fast)
         run: |
           rustup toolchain install 1.99.0-aarch64-apple-darwin --profile minimal
-          rustup target add 1.99.0-aarch64-apple-darwin aarch64-apple-ios
-          rustup target add 1.99.0-aarch64-apple-darwin aarch64-apple-ios-sim
+          rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios
+          rustup target add --toolchain 1.99.0-aarch64-apple-darwin aarch64-apple-ios-sim
           rustup run 1.99.0-aarch64-apple-darwin cargo build --release \
             --manifest-path plugins/rust_api/rust/Cargo.toml \
             --package rust_api --target aarch64-apple-ios
