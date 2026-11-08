@@ -137,6 +137,16 @@ jobs:
           rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-* 2>/dev/null || true
           archive="$RUNNER_TEMP/FlClash.xcarchive"
 
+          # release build: clear stale Flutter native-assets hook cache first
+          echo '=== Clearing stale Flutter native-assets hook cache ==='
+          rm -rf "$RUNNER_WORKSPACE/.dart_tool/hooks_runner"
+
+          # native-assets hook uses macOS target; existing builds must not link
+          # the iOS part if their stale cache triggers mixed platform objects
+          if [[ "$CONFIGURATION" == Release ]]; then
+            rm -rf "$RUNNER_WORKSPACE/.dart_tool/hooks_runner"
+          fi
+
           # The project's own targets are the wanted ones: app and tunnel at
           # 15.0, widget at 17.0 (its SwiftUI APIs need it). Overriding the
           # deployment target on the command line hits every target at once and
