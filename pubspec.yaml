@@ -5,6 +5,10 @@ version: 0.9.3+2026110401
 environment:
   sdk: '>=3.10.0 <4.0.0'
 
+platforms:
+  ios:
+    deployment_target: "15.0"
+
 hooks:
   user_defines:
     setup:
