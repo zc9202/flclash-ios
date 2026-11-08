@@ -169,6 +169,8 @@ jobs:
             if ! run_archive IPHONEOS_DEPLOYMENT_TARGET="$DEPLOY_TARGET"; then
               grep -E "error|--> " "$RUNNER_TEMP/archive.log" | head -40 || true
               tail -60 "$RUNNER_TEMP/archive.log" || true
+              echo '=== Flutter native hook diagnostics ==='
+              find .dart_tool/hooks_runner -type f \( -name '*.log' -o -name 'stderr*' -o -name 'stdout*' \) -print -exec tail -150 {} \; || true
               exit 1
             fi
             echo "ARCHIVED with IPHONEOS_DEPLOYMENT_TARGET=$DEPLOY_TARGET" | tee "$RUNNER_TEMP/used-target.txt"
@@ -199,7 +201,7 @@ jobs:
           # the NetworkExtension entitlement.
           find "$RUNNER_TEMP/ipa/Payload" -name "*.xcent" -print
 
-          name="FlClash-0.9.2-ios-arm64-unsigned.ipa"
+          name="FlClash-0.9.3-ios-arm64-unsigned.ipa"
           ( cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/output/$name" Payload )
           ls -lh "output/$name"
           unzip -l "output/$name" | head -20
