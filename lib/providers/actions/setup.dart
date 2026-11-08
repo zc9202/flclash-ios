@@ -213,16 +213,34 @@ class SetupAction extends _$SetupAction {
   Future<bool> _start(_RunRequest request) async {
     if (request.initialize) {
       var applied = false;
+      Object? failure;
+      StackTrace? failureTrace;
       try {
         applied = await applyProfile(
           force: !request.resume,
           preloadInvoke: () => _startCoreRunning(request),
         );
-      } catch (_) {
-        applied = false;
+      } catch (error, stackTrace) {
+        failure = error;
+        failureTrace = stackTrace;
       }
       if (!applied && _isCurrent(request)) {
         await globalState.safeRun(() => setRunning(false));
+      }
+      // A first start that fails used to fail silently: the switch flipped
+      // back with no reason. Surface it, the cause is usually the tunnel
+      // entitlement or the app group in the signature.
+      if (failure != null) {
+        commonPrint.log(
+          'start failed: $failure\n$failureTrace',
+          logLevel: LogLevel.error,
+        );
+        if (_isCurrent(request)) {
+          dialogs.showBanner(
+            userFacingErrorMessage(failure, currentAppLocalizations),
+            level: BannerLevel.error,
+          );
+        }
       }
       return applied;
     }
